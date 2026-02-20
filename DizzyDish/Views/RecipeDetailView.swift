@@ -7,6 +7,8 @@ struct RecipeDetailView: View {
     @State private var completedSteps: Set<Int> = []
     @State private var isCookMode: Bool = false
     @State private var showScaler: Bool = false
+    @State private var scaleFactor: Double?
+    @State private var isScaled: Bool = false
 
     var body: some View {
         ScrollView {
@@ -29,11 +31,33 @@ struct RecipeDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: DS.Spacing.medium) {
                     Button {
-                        showScaler = true
+                        if scaleFactor != nil {
+                            withAnimation(.snappy) { isScaled.toggle() }
+                        } else {
+                            showScaler = true
+                        }
                     } label: {
-                        Image(systemName: "scalemass.fill")
+                        Image(systemName: isScaled ? "scalemass.fill" : "scalemass")
                             .symbolRenderingMode(.hierarchical)
-                            .foregroundStyle(DS.Colors.warm)
+                            .foregroundStyle(isScaled ? DS.Colors.warm : DS.Colors.textSoft)
+                    }
+                    .sensoryFeedback(.selection, trigger: isScaled)
+                    .contextMenu {
+                        if scaleFactor != nil {
+                            Button {
+                                showScaler = true
+                            } label: {
+                                Label("Reconfigure", systemImage: "slider.horizontal.3")
+                            }
+                            Button(role: .destructive) {
+                                withAnimation(.snappy) {
+                                    scaleFactor = nil
+                                    isScaled = false
+                                }
+                            } label: {
+                                Label("Clear Scaling", systemImage: "xmark.circle")
+                            }
+                        }
                     }
 
                     Button {
@@ -55,10 +79,13 @@ struct RecipeDetailView: View {
         }
         .sensoryFeedback(.selection, trigger: isCookMode)
         .sheet(isPresented: $showScaler) {
-            RecipeScalerView(recipe: recipe)
-                .presentationDetents([.medium, .large])
-                .presentationDragIndicator(.visible)
-                .presentationContentInteraction(.scrolls)
+            RecipeScalerView(recipe: recipe) { factor in
+                scaleFactor = factor
+                withAnimation(.snappy) { isScaled = true }
+            }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+            .presentationContentInteraction(.scrolls)
         }
     }
 
@@ -91,7 +118,12 @@ struct RecipeDetailView: View {
 
             HStack(spacing: DS.Spacing.large) {
                 Label(recipe.timeLabel, systemImage: "clock.fill")
-                Label("\(recipe.servings) servings", systemImage: "person.2.fill")
+                if isScaled, let factor = scaleFactor {
+                    let scaledServings = max(1, Int(round(Double(recipe.servings) * factor)))
+                    Label("\(scaledServings) servings", systemImage: "person.2.fill")
+                } else {
+                    Label("\(recipe.servings) servings", systemImage: "person.2.fill")
+                }
                 Label(recipe.difficulty, systemImage: recipe.difficultyIcon)
             }
             .font(isCookMode ? DS.Typography.bodyMedium : DS.Typography.bodySmall)
@@ -118,15 +150,31 @@ struct RecipeDetailView: View {
 
     private var ingredientsSection: some View {
         VStack(alignment: .leading, spacing: DS.Spacing.medium) {
-            Text("Ingredients")
-                .font(isCookMode ? DS.Typography.displaySmall : DS.Typography.titleMedium)
-                .foregroundStyle(DS.Colors.textPrimary)
+            HStack {
+                Text("Ingredients")
+                    .font(isCookMode ? DS.Typography.displaySmall : DS.Typography.titleMedium)
+                    .foregroundStyle(DS.Colors.textPrimary)
+
+                Spacer()
+
+                if isScaled, let factor = scaleFactor {
+                    let percent = Int(round(factor * 100))
+                    Text("\(percent)%")
+                        .font(DS.Typography.labelMedium)
+                        .foregroundStyle(DS.Colors.warm)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(DS.Colors.warm.opacity(0.1))
+                        .clipShape(Capsule())
+                }
+            }
 
             VStack(spacing: 2) {
                 ForEach(recipe.ingredients) { ingredient in
+                    let isChecked = checkedIngredients.contains(ingredient.id)
                     Button {
                         withAnimation(.snappy) {
-                            if checkedIngredients.contains(ingredient.id) {
+                            if isChecked {
                                 checkedIngredients.remove(ingredient.id)
                             } else {
                                 checkedIngredients.insert(ingredient.id)
@@ -134,22 +182,15 @@ struct RecipeDetailView: View {
                         }
                     } label: {
                         HStack(spacing: DS.Spacing.medium) {
-                            Image(systemName: checkedIngredients.contains(ingredient.id) ? "checkmark.circle.fill" : "circle")
+                            Image(systemName: isChecked ? "checkmark.circle.fill" : "circle")
                                 .font(.body)
-                                .foregroundStyle(
-                                    checkedIngredients.contains(ingredient.id)
-                                        ? DS.Colors.green
-                                        : DS.Colors.textLight
-                                )
+                                .foregroundStyle(isChecked ? DS.Colors.green : DS.Colors.textLight)
 
-                            Text(ingredient.displayText)
+                            Text(displayText(for: ingredient))
                                 .font(isCookMode ? DS.Typography.bodyLarge : DS.Typography.bodyMedium)
-                                .foregroundStyle(
-                                    checkedIngredients.contains(ingredient.id)
-                                        ? DS.Colors.textSoft
-                                        : DS.Colors.textPrimary
-                                )
-                                .strikethrough(checkedIngredients.contains(ingredient.id))
+                                .foregroundStyle(isChecked ? DS.Colors.textSoft : DS.Colors.textPrimary)
+                                .strikethrough(isChecked)
+                                .contentTransition(.numericText())
 
                             Spacer()
                         }
@@ -157,7 +198,7 @@ struct RecipeDetailView: View {
                         .padding(.horizontal, DS.Spacing.medium)
                         .contentShape(Rectangle())
                     }
-                    .sensoryFeedback(.selection, trigger: checkedIngredients.contains(ingredient.id))
+                    .sensoryFeedback(.selection, trigger: isChecked)
                 }
             }
             .background(DS.Colors.card)
@@ -238,5 +279,12 @@ struct RecipeDetailView: View {
                 }
             }
         }
+    }
+
+    private func displayText(for ingredient: Ingredient) -> String {
+        if isScaled, let factor = scaleFactor {
+            return IngredientScaler.scaledDisplayText(for: ingredient, factor: factor)
+        }
+        return ingredient.displayText
     }
 }
