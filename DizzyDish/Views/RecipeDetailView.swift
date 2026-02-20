@@ -6,6 +6,7 @@ struct RecipeDetailView: View {
     @State private var checkedIngredients: Set<String> = []
     @State private var completedSteps: Set<Int> = []
     @State private var isCookMode: Bool = false
+    @State private var showScaler: Bool = false
 
     var body: some View {
         ScrollView {
@@ -28,6 +29,14 @@ struct RecipeDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: DS.Spacing.medium) {
                     Button {
+                        showScaler = true
+                    } label: {
+                        Image(systemName: "scalemass.fill")
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(DS.Colors.warm)
+                    }
+
+                    Button {
                         withAnimation(.snappy) { isCookMode.toggle() }
                     } label: {
                         Image(systemName: isCookMode ? "book.closed.fill" : "book.closed")
@@ -45,6 +54,12 @@ struct RecipeDetailView: View {
             }
         }
         .sensoryFeedback(.selection, trigger: isCookMode)
+        .sheet(isPresented: $showScaler) {
+            RecipeScalerView(recipe: recipe)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+                .presentationContentInteraction(.scrolls)
+        }
     }
 
     private var heroImage: some View {
