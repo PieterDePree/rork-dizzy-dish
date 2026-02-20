@@ -106,18 +106,6 @@ struct HomeView: View {
                 }
                 .padding(.top, DS.Spacing.small)
 
-                Button {
-                    viewModel.decideForMe()
-                } label: {
-                    HStack(spacing: DS.Spacing.small) {
-                        Image(systemName: "sparkles")
-                            .font(.callout)
-                        Text("just decide for me")
-                            .font(DS.Typography.labelLarge)
-                    }
-                    .foregroundStyle(DS.Colors.warm)
-                }
-                .padding(.bottom, DS.Spacing.xl)
             }
             .padding(.horizontal, DS.Spacing.xl)
         }
